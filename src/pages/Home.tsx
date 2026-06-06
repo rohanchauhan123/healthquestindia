@@ -29,19 +29,55 @@ const serviceIcons: Record<string, React.ReactNode> = {
 };
 
 export function Home() {
-  const [formStatus, setFormStatus] = useState<"idle" | "submitting" | "success">("idle");
+  const [formStatus, setFormStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [formError, setFormError] = useState("");
   const [, navigate] = useLocation();
   const services = useServices();
+  const [selectedCountry, setSelectedCountry] = useState("");
+  const [selectedTreatment, setSelectedTreatment] = useState("");
 
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormStatus("submitting");
-    setTimeout(() => setFormStatus("success"), 1000);
+    setFormError("");
+
+    const form = e.currentTarget;
+    const data = {
+      name: (form.querySelector("#name") as HTMLInputElement)?.value || "",
+      country: selectedCountry,
+      phone: (form.querySelector("#phone") as HTMLInputElement)?.value || "",
+      treatment: selectedTreatment,
+      message: (form.querySelector("#message") as HTMLTextAreaElement)?.value || "",
+    };
+
+    if (!data.name || !data.phone || !data.treatment) {
+      setFormError("Please fill in your name, phone number, and treatment.");
+      setFormStatus("idle");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setFormStatus("success");
+      } else {
+        setFormError(json.error || "Something went wrong. Please try again.");
+        setFormStatus("error");
+      }
+    } catch {
+      setFormError("Network error. Please call or WhatsApp us directly.");
+      setFormStatus("error");
+    }
   };
 
   return (
@@ -415,31 +451,36 @@ export function Home() {
                       </div>
                       <div className="space-y-1.5">
                         <Label htmlFor="country">Country *</Label>
-                        <Select required>
+                        <Select value={selectedCountry} onValueChange={setSelectedCountry} required>
                           <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="nigeria">Nigeria</SelectItem>
-                            <SelectItem value="ghana">Ghana</SelectItem>
-                            <SelectItem value="kenya">Kenya</SelectItem>
-                            <SelectItem value="south_africa">South Africa</SelectItem>
-                            <SelectItem value="ethiopia">Ethiopia</SelectItem>
-                            <SelectItem value="tanzania">Tanzania</SelectItem>
-                            <SelectItem value="uganda">Uganda</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
+                            <SelectItem value="Nigeria">Nigeria</SelectItem>
+                            <SelectItem value="Ghana">Ghana</SelectItem>
+                            <SelectItem value="Kenya">Kenya</SelectItem>
+                            <SelectItem value="South Africa">South Africa</SelectItem>
+                            <SelectItem value="Ethiopia">Ethiopia</SelectItem>
+                            <SelectItem value="Tanzania">Tanzania</SelectItem>
+                            <SelectItem value="Uganda">Uganda</SelectItem>
+                            <SelectItem value="Bangladesh">Bangladesh</SelectItem>
+                            <SelectItem value="Nepal">Nepal</SelectItem>
+                            <SelectItem value="Afghanistan">Afghanistan</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="phone">Phone / WhatsApp *</Label>
-                      <Input id="phone" required placeholder="+234 800 000 0000" />
+                      <Input id="phone" required placeholder="+234 800 000 0000" type="tel" />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="treatment">Treatment Needed *</Label>
-                      <Select required>
+                      <Select value={selectedTreatment} onValueChange={setSelectedTreatment} required>
                         <SelectTrigger><SelectValue placeholder="Select treatment" /></SelectTrigger>
                         <SelectContent>
                           {services.map(s => <SelectItem key={s.slug} value={s.slug}>{s.name}</SelectItem>)}
+                          <SelectItem value="liver-transplant">Liver Transplant</SelectItem>
+                          <SelectItem value="bone-marrow-transplant">Bone Marrow Transplant</SelectItem>
                           <SelectItem value="other">Other / Not sure</SelectItem>
                         </SelectContent>
                       </Select>
@@ -453,13 +494,16 @@ export function Home() {
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="reports">Upload Medical Reports (Optional)</Label>
-                      <Input id="reports" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" className="cursor-pointer" />
-                      <p className="text-xs text-gray-400">PDF, JPG, PNG or DOC. Max 10MB.</p>
-                    </div>
+                    <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+                      📎 To share medical reports, send them directly via <a href="https://wa.me/918527264675" className="text-[#25D366] font-semibold" target="_blank" rel="noreferrer">WhatsApp</a> after submitting.
+                    </p>
+                    {formError && (
+                      <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        ⚠️ {formError}
+                      </div>
+                    )}
                     <Button type="submit" size="lg" className="w-full h-12 font-bold text-base bg-[#b8962a] hover:bg-[#a07d20] text-white" disabled={formStatus === "submitting"}>
-                      {formStatus === "submitting" ? "Sending..." : "Get My Free Treatment Plan"}
+                      {formStatus === "submitting" ? "Sending…" : "Get My Free Treatment Plan"}
                     </Button>
                   </form>
                 )}
