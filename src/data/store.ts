@@ -75,14 +75,31 @@ export async function initStore(): Promise<void> {
       .from(TABLE)
       .select("data")
       .eq("id", ROW_ID)
-      .single();
+      .maybeSingle(); // maybeSingle returns null instead of throwing 406/PGRST116 when row is missing
 
-    if (error || !data) return; // row doesn't exist yet → use defaults
+    if (error) {
+      console.error("Supabase load error:", error);
+      return;
+    }
+
+    if (!data) {
+      // Row doesn't exist yet: insert seed/default data into Supabase
+      console.log("Supabase table empty. Seeding defaults...");
+      const { error: seedError } = await supabase
+        .from(TABLE)
+        .insert({ id: ROW_ID, data: DEFAULTS, updated_at: new Date().toISOString() });
+      
+      if (seedError) {
+        console.error("Failed to seed Supabase table:", seedError);
+      }
+      return; // Defaults are already loaded in cached
+    }
 
     const remote = data.data as Partial<StoreState>;
     cached = merge(remote);
     notify();
-  } catch {
+  } catch (err) {
+    console.error("Failed to initialize store:", err);
     // silently fall back to localStorage
   }
 }
